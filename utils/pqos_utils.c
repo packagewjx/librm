@@ -2,7 +2,6 @@
 #include "pqos.h"
 #include "stdlib.h"
 #include "string.h"
-#include <pthread.h>
 
 unsigned int *GetAllCoresId(const struct pqos_cpuinfo *cpu, unsigned int *count) {
     *count = 0;
@@ -22,16 +21,4 @@ unsigned int *GetAllCoresId(const struct pqos_cpuinfo *cpu, unsigned int *count)
     }
 
     return result;
-}
-
-struct ProcessMonitorContext {
-
-};
-
-int monitorProcessStart(const struct ProcessMonitorContext *ctx) {
-
-}
-
-int monitorProcessStop(const struct ProcessMonitorContext *ctx) {
-
 }

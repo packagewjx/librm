@@ -3,7 +3,7 @@
 extern "C"
 {
 #include <pqos.h>
-#include "../pqos_utils.h"
+#include "../utils/pqos_utils.h"
 }
 
 class PqosTest : public ::testing::Test

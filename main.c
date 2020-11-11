@@ -1,7 +1,7 @@
 #include <pqos.h>
 #include <stdlib.h>
 #include <string.h>
-#include "pqos_utils.h"
+#include "utils/pqos_utils.h"
 
 void testPoll(unsigned int *cores, unsigned int numCore, pid_t pid);
 
@@ -36,8 +36,7 @@ void testPoll(unsigned int *cores, unsigned int numCore, pid_t pid) {
 
     for (int i = 0; i < 10000; i++) {
         pqos_mon_poll(groups, 1);
-        sleep(1);
-        printf("%ld\n", group.values.mbm_local_delta);
+        printf("%ld %ld\n", group.values.mbm_local, group.values.mbm_local_delta);
     }
     pqos_mon_stop(&group);
 }
