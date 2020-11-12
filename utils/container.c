@@ -36,4 +36,8 @@ void *stackPop(struct Stack *stack) {
     return item;
 }
 
+void stackDestroy(struct Stack *stack) {
+    free(stack->arr);
+}
+
 

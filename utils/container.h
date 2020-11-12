@@ -16,6 +16,8 @@ void stackPush(struct Stack* stack, void* item);
 
 void* stackPop(struct Stack* stack);
 
+void stackDestroy(struct Stack *stack);
+
 #define RESOURCEMANAGER_CONTAINER_H
 
 #endif //RESOURCEMANAGER_CONTAINER_H

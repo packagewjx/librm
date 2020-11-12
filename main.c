@@ -28,15 +28,16 @@ int main(int argc, char const *argv[]) {
 
 void testPoll(unsigned int *cores, unsigned int numCore, pid_t pid) {
     struct pqos_mon_data group;
-    pqos_mon_start(numCore, cores, PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW | PQOS_MON_EVENT_L3_OCCUP, NULL,
+    pqos_mon_start_pid(pid, PQOS_MON_EVENT_L3_OCCUP | PQOS_PERF_EVENT_IPC, NULL,
                    &group);
-    pqos_mon_add_pids(1, &pid, &group);
+
     sleep(1);
     struct pqos_mon_data *groups[] = {&group};
 
     for (int i = 0; i < 10000; i++) {
         pqos_mon_poll(groups, 1);
-        printf("%ld %ld\n", group.values.mbm_local, group.values.mbm_local_delta);
+        sleep(1);
+        printf("%ld %f\n", group.values.llc, group.values.ipc);
     }
     pqos_mon_stop(&group);
 }
