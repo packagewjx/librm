@@ -8,6 +8,9 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+#define ERR_MONITOR_FULL 100
+#define ERR_DUPLICATE_PID 101
+
 struct ProcessMonitor;
 
 /**
@@ -32,6 +35,8 @@ int monitorDestroy(struct ProcessMonitor *ctx);
  *
  * @return 执行结果
  * @retval 0 成功
+ * @retval ERR_MONITOR_FULL 代表不能再添加监控
+ * @retval ESRCH 代表进程不存在
  * @retval 其他值 失败
  */
 int monitorAddProcess(struct ProcessMonitor *ctx, pid_t pid);
@@ -41,6 +46,7 @@ int monitorAddProcess(struct ProcessMonitor *ctx, pid_t pid);
  *
  * @return 执行结果
  * @retval 0 代表删除成功，值得注意的是若pid并不存在于监控范围也算是成功
+ * @retval ESRCH 代表找不到这个进程
  * @retval 非0 代表失败
  */
 int monitorRemoveProcess(struct ProcessMonitor *ctx, pid_t pid);
