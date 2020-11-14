@@ -19,25 +19,19 @@ int main(int argc, char const *argv[]) {
     printf("%d\n", coreCount);
 
     pid_t pid = strtol(argv[1], NULL, 10);
-    testPoll(cores, coreCount, pid);
+
+    struct pqos_mba mba = {
+            .class_id = 1,
+            .ctrl = PQOS_MBA_ANY,
+            .mb_max = 100,
+    };
+    int ret = pqos_mba_set(0, 1, &mba, NULL);
+    printf("%d\n", ret);
+
+
 
     pqos_fini();
 
     return 0;
 }
 
-void testPoll(unsigned int *cores, unsigned int numCore, pid_t pid) {
-    struct pqos_mon_data group;
-    pqos_mon_start_pid(pid, PQOS_MON_EVENT_L3_OCCUP | PQOS_PERF_EVENT_IPC, NULL,
-                   &group);
-
-    sleep(1);
-    struct pqos_mon_data *groups[] = {&group};
-
-    for (int i = 0; i < 10000; i++) {
-        pqos_mon_poll(groups, 1);
-        sleep(1);
-        printf("%ld %f\n", group.values.llc, group.values.ipc);
-    }
-    pqos_mon_stop(&group);
-}

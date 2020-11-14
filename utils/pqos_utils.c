@@ -22,3 +22,8 @@ unsigned int *GetAllCoresId(const struct pqos_cpuinfo *cpu, unsigned int *count)
 
     return result;
 }
+
+unsigned int *GetAllSocketId(int *numSockets) {
+    struct pqos_cpuinfo *cpu;
+
+}

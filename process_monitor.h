@@ -51,4 +51,10 @@ int monitorAddProcess(struct ProcessMonitor *ctx, pid_t pid);
  */
 int monitorRemoveProcess(struct ProcessMonitor *ctx, pid_t pid);
 
+/**
+ * 获取最大能够同时监控的进程数量
+ * @return 最大数量
+ */
+unsigned int monitorGetMaxProcess(struct ProcessMonitor *ctx);
+
 #endif //RESOURCEMANAGER_PROCESS_MONITOR_H

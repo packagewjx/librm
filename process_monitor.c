@@ -203,3 +203,7 @@ int monitorRemoveProcess(struct ProcessMonitor *ctx, pid_t pid) {
     return ESRCH;
 }
 
+unsigned int monitorGetMaxProcess(struct ProcessMonitor *ctx) {
+    return ctx->maxRMID;
+}
+
