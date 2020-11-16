@@ -1,2 +1,1 @@
-add_library(log src/log.c)
-include_directories(src)
+add_library(log OBJECT src/log.c)

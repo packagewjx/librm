@@ -2,16 +2,16 @@
 // Created by wjx on 2020/11/12.
 //
 
-#include "control_scheme.h"
+#include "resource_manager.h"
 
 #include <pqos.h>
 
-int checkScheme(struct CLOSScheme *schemes, int lenSchemes) {
+int checkScheme(struct rm_clos_scheme *schemes, int lenSchemes) {
     if (schemes == NULL) {
         return ERR_NULL_PTR;
     }
-    struct CLOSCapabilityInfo info;
-    int ret = controlSchemeGetInfo(&info);
+    struct rm_capability_info info;
+    int ret = rm_get_capability_info(&info);
     if (ret != PQOS_RETVAL_OK) {
         return ret;
     }
@@ -39,7 +39,7 @@ int checkScheme(struct CLOSScheme *schemes, int lenSchemes) {
     return PQOS_RETVAL_OK;
 }
 
-int controlSchemeSet(struct CLOSScheme *schemes, int lenSchemes) {
+int rm_control_scheme_set(struct rm_clos_scheme *schemes, int lenSchemes) {
     int ret = checkScheme(schemes, lenSchemes);
     if (ret != PQOS_RETVAL_OK) {
         return ret;
@@ -101,7 +101,7 @@ int controlSchemeSet(struct CLOSScheme *schemes, int lenSchemes) {
     return 0;
 }
 
-int controlSchemeGetInfo(struct CLOSCapabilityInfo *info) {
+int rm_get_capability_info(struct rm_capability_info *info) {
     const struct pqos_cap *cap;
     int ret = pqos_cap_get(&cap, NULL);
     if (ret != PQOS_RETVAL_OK) {

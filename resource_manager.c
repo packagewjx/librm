@@ -13,8 +13,8 @@ struct pqos_config config = {
 
 int init;
 
-int resourceManagerInit() {
-    int retVal = 1;
+int rm_init() {
+    int retVal = 0;
     if (init == 0) {
         retVal = pqos_init(&config);
         if (retVal == PQOS_RETVAL_OK) {
@@ -25,8 +25,8 @@ int resourceManagerInit() {
     return retVal;
 }
 
-int resourceManagerFinalize() {
-    int retVal = 1;
+int rm_finalize() {
+    int retVal = 0;
     if (init == 1) {
         retVal = pqos_fini();
         if (retVal == PQOS_RETVAL_OK) {
@@ -36,6 +36,3 @@ int resourceManagerFinalize() {
 
     return retVal;
 }
-
-
-

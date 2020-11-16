@@ -7,7 +7,7 @@
 extern "C" {
 #include <fcntl.h>
 #include "pqos.h"
-#include "../process_monitor.h"
+#include "../resource_manager.h"
 }
 
 #include <cstdlib>
@@ -37,57 +37,57 @@ protected:
 };
 
 TEST_F(ProcessMonitorTest, single_process) {
-    ProcessMonitor *monitor = monitorCreate(100);
+    ProcessMonitor *monitor = rm_monitor_create(100);
     ASSERT_NE(nullptr, monitor);
-    ASSERT_EQ(0, monitorAddProcess(monitor, 1));
+    ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
     sleep(1);
-    monitorRemoveProcess(monitor, 1);
-    monitorDestroy(monitor);
+    rm_monitor_remove_process(monitor, 1);
+    rm_monitor_destroy(monitor);
 
     // 检查文件存在
     checkCsv("1.csv");
 }
 
 TEST_F(ProcessMonitorTest, multiple_process) {
-    ProcessMonitor *monitor = monitorCreate(100);
+    ProcessMonitor *monitor = rm_monitor_create(100);
     ASSERT_NE(nullptr, monitor);
-    ASSERT_EQ(0, monitorAddProcess(monitor, 1));
-    ASSERT_EQ(0, monitorAddProcess(monitor, 2));
+    ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
+    ASSERT_EQ(0, rm_monitor_add_process(monitor, 2));
     sleep(1);
-    monitorRemoveProcess(monitor, 1);
-    monitorRemoveProcess(monitor, 2);
-    monitorDestroy(monitor);
+    rm_monitor_remove_process(monitor, 1);
+    rm_monitor_remove_process(monitor, 2);
+    rm_monitor_destroy(monitor);
 
     checkCsv("1.csv");
     checkCsv("2.csv");
 }
 
 TEST_F(ProcessMonitorTest, illeagl_process) {
-    ProcessMonitor *monitor = monitorCreate(1000000);
+    ProcessMonitor *monitor = rm_monitor_create(1000000);
     ASSERT_NE(nullptr, monitor);
 
     // 不存在的
-    ASSERT_EQ(ESRCH, monitorAddProcess(monitor, 1000000));
+    ASSERT_EQ(ESRCH, rm_monitor_add_process(monitor, 1000000));
 
     // 重复的
-    ASSERT_EQ(0, monitorAddProcess(monitor, 1));
-    ASSERT_EQ(ERR_DUPLICATE_PID, monitorAddProcess(monitor, 1));
+    ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
+    ASSERT_EQ(ERR_DUPLICATE_PID, rm_monitor_add_process(monitor, 1));
 }
 
 TEST_F(ProcessMonitorTest, remove_process) {
-    ProcessMonitor *m = monitorCreate(10000);
+    ProcessMonitor *m = rm_monitor_create(10000);
     ASSERT_NE(nullptr, m);
-    ASSERT_EQ(0, monitorAddProcess(m, 1));
-    ASSERT_EQ(0, monitorAddProcess(m, 2));
-    ASSERT_EQ(0, monitorAddProcess(m, getpid()));
+    ASSERT_EQ(0, rm_monitor_add_process(m, 1));
+    ASSERT_EQ(0, rm_monitor_add_process(m, 2));
+    ASSERT_EQ(0, rm_monitor_add_process(m, getpid()));
 
-    ASSERT_EQ(0, monitorRemoveProcess(m, getpid()));
-    ASSERT_EQ(0, monitorRemoveProcess(m, 1));
-    ASSERT_EQ(0, monitorRemoveProcess(m, 2));
+    ASSERT_EQ(0, rm_monitor_remove_process(m, getpid()));
+    ASSERT_EQ(0, rm_monitor_remove_process(m, 1));
+    ASSERT_EQ(0, rm_monitor_remove_process(m, 2));
 }
 
 TEST(process_monitor, init_fail) {
-    ProcessMonitor *p = monitorCreate(100);
+    ProcessMonitor *p = rm_monitor_create(100);
     ASSERT_EQ(nullptr, p);
 }
 

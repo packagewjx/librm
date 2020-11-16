@@ -2,7 +2,7 @@
 // Created by wjx on 2020/11/10.
 //
 
-#include "process_monitor.h"
+#include "resource_manager.h"
 #include "utils/general.h"
 
 #include <stdio.h>
@@ -12,6 +12,8 @@
 #include <pqos.h>
 #include <errno.h>
 #include <signal.h>
+#include <pthread.h>
+#include <stdbool.h>
 
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #define container_of(ptr, type, member) ({      \
@@ -100,7 +102,7 @@ void *monitorThread(void *args) {
     return NULL;
 }
 
-struct ProcessMonitor *monitorCreate(unsigned int sleepMilli) {
+struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli) {
     const struct pqos_cap *cap;
     const struct pqos_cpuinfo *cpu;
     if (PQOS_RETVAL_OK != pqos_cap_get(&cap, &cpu)) {
@@ -118,7 +120,7 @@ struct ProcessMonitor *monitorCreate(unsigned int sleepMilli) {
     return ctx;
 }
 
-int monitorDestroy(struct ProcessMonitor *ctx) {
+int rm_monitor_destroy(struct ProcessMonitor *ctx) {
     ctx->running = false;
 
     // 等待结束
@@ -141,7 +143,7 @@ int monitorDestroy(struct ProcessMonitor *ctx) {
     return 0;
 }
 
-int monitorAddProcess(struct ProcessMonitor *ctx, pid_t pid) {
+int rm_monitor_add_process(struct ProcessMonitor *ctx, pid_t pid) {
     // 检查进程是否存在
     if (kill(pid, 0) == -1) {
         return errno;
@@ -187,7 +189,7 @@ int monitorAddProcess(struct ProcessMonitor *ctx, pid_t pid) {
     return retVal;
 }
 
-int monitorRemoveProcess(struct ProcessMonitor *ctx, pid_t pid) {
+int rm_monitor_remove_process(struct ProcessMonitor *ctx, pid_t pid) {
     pthread_mutex_lock(&ctx->lock);
     for (int i = 0; i < ctx->lenGroups; i++) {
         if (ctx->groups[i]->pids[0] == pid) {
@@ -203,7 +205,7 @@ int monitorRemoveProcess(struct ProcessMonitor *ctx, pid_t pid) {
     return ESRCH;
 }
 
-unsigned int monitorGetMaxProcess(struct ProcessMonitor *ctx) {
+unsigned int rm_monitor_get_max_process(struct ProcessMonitor *ctx) {
     return ctx->maxRMID;
 }
 

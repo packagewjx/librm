@@ -7,7 +7,7 @@
 #include <cstdlib>
 
 extern "C" {
-#include "../control_scheme.h"
+#include "../resource_manager.h"
 }
 
 
@@ -28,8 +28,8 @@ protected:
 };
 
 TEST_F(ControlSchemeTest, getInfo) {
-    CLOSCapabilityInfo info{};
-    ASSERT_EQ(0, controlSchemeGetInfo(&info));
+    rm_capability_info info{};
+    ASSERT_EQ(0, rm_get_capability_info(&info));
     ASSERT_NE(0, info.numCatClos);
     ASSERT_NE(0, info.numMbaClos);
     ASSERT_NE(0, info.minLLCWays);
@@ -37,8 +37,8 @@ TEST_F(ControlSchemeTest, getInfo) {
 }
 
 TEST_F(ControlSchemeTest, setNormalScheme) {
-    CLOSCapabilityInfo info{};
-    controlSchemeGetInfo(&info);
+    rm_capability_info info{};
+    rm_get_capability_info(&info);
     int closSize = 3;
     unsigned int numCLos = (info.numCatClos > info.numMbaClos ? info.numMbaClos : info.numCatClos) - 1;
     unsigned int numPid = closSize * numCLos;
@@ -52,7 +52,7 @@ TEST_F(ControlSchemeTest, setNormalScheme) {
         curr++;
     }
 
-    auto *schemes = (CLOSScheme *) malloc(sizeof(CLOSScheme) * numCLos);
+    auto *schemes = (rm_clos_scheme *) malloc(sizeof(rm_clos_scheme) * numCLos);
 
     for (int i = 0; i < numCLos; i++) {
         schemes[i].closNum = i + 1;
@@ -62,7 +62,7 @@ TEST_F(ControlSchemeTest, setNormalScheme) {
         schemes[i].llc = 0x7ff;
     }
 
-    ASSERT_EQ(0, controlSchemeSet(schemes, numCLos));
+    ASSERT_EQ(0, rm_control_scheme_set(schemes, numCLos));
 
     unsigned int buf;
     for (int i = 0; i < numCLos; i++) {
@@ -81,10 +81,10 @@ TEST_F(ControlSchemeTest, setNormalScheme) {
 }
 
 TEST_F(ControlSchemeTest, setTooManyScheme) {
-    CLOSCapabilityInfo info{};
-    controlSchemeGetInfo(&info);
+    rm_capability_info info{};
+    rm_get_capability_info(&info);
     unsigned int minClos = info.numCatClos < info.numMbaClos ? info.numCatClos : info.numMbaClos;
-    CLOSScheme *schemes = (CLOSScheme *) malloc((minClos + 1) * sizeof(CLOSScheme));
+    rm_clos_scheme *schemes = (rm_clos_scheme *) malloc((minClos + 1) * sizeof(rm_clos_scheme));
     pid_t dummy = 1;
     for (int i = 0; i < minClos; i++) {
         schemes[i].closNum = i + 1;
@@ -93,6 +93,6 @@ TEST_F(ControlSchemeTest, setTooManyScheme) {
         schemes[i].lenProcessList = 1;
         schemes[i].llc = 0xf;
     }
-    ASSERT_NE(0, controlSchemeSet(schemes, minClos));
+    ASSERT_NE(0, rm_control_scheme_set(schemes, minClos));
     free(schemes);
 }
