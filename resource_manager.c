@@ -11,14 +11,14 @@ struct pqos_config config = {
         .interface = PQOS_INTER_OS,
 };
 
-int init;
+int init = 0;
 
 int rm_init() {
     int retVal = 0;
     if (init == 0) {
         retVal = pqos_init(&config);
         if (retVal == PQOS_RETVAL_OK) {
-            init++;
+            init = 1;
         }
     }
 
@@ -30,7 +30,7 @@ int rm_finalize() {
     if (init == 1) {
         retVal = pqos_fini();
         if (retVal == PQOS_RETVAL_OK) {
-            init--;
+            init = 0;
         }
     }
 

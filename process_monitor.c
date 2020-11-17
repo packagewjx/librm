@@ -4,6 +4,7 @@
 
 #include "resource_manager.h"
 #include "utils/general.h"
+#include "log/src/log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,33 +73,53 @@ void *monitorThread(void *args) {
             .tv_sec = ctx->sleepMilli / 1000,
             .tv_nsec = ctx->sleepMilli % 1000 * 1000000
     };
+    log_info("进程监控线程启动");
+    int pollRetry = 0;
 
     while (ctx->running) {
         pthread_mutex_lock(&ctx->lock);
-
-        for (int i = 0; i < ctx->lenGroups; i++) {
-            pqos_mon_poll(ctx->groups, ctx->lenGroups);
-
-            for (int j = 0; j < ctx->lenGroups; j++) {
-                struct ProcessMonitorContext *monitorCtx = container_of(ctx->groups[j], struct ProcessMonitorContext,
-                                                                        group);
-                struct pqos_mon_data *data = ctx->groups[j];
-                struct ProcessMonitorRecord record;
-                record.pid = monitorCtx->pid;
-                record.llc = data->values.llc;
-                record.timestamp = getCurrentTimeMilli();
-                record.llcMisses = data->values.llc_misses;
-                record.ipc = data->values.ipc;
-                record.localMemoryDelta = data->values.mbm_local_delta;
-                record.remoteMemoryDelta = data->values.mbm_remote_delta;
-                writeRecord(&record, monitorCtx->outFile);
-            }
+        if (ctx->lenGroups == 0) {
+            log_info("目前没有进程监控，等待下一次唤醒");
+            goto unlockAndSleep;
         }
 
+        log_info("正在抓取%d个监控进程的监控数据", ctx->lenGroups);
+        int retVal = pqos_mon_poll(ctx->groups, ctx->lenGroups);
+
+        if (retVal != PQOS_RETVAL_OK) {
+            log_error("监控抓取失败，返回值为%d");
+            pollRetry++;
+            if (pollRetry == 5) {
+                log_error("多次重试均失败，监控线程退出");
+                ctx->running = false;
+            }
+            goto unlockAndSleep;
+        }
+        if (pollRetry > 0) {
+            pollRetry = 0;
+        }
+
+        for (int i = 0; i < ctx->lenGroups; i++) {
+            struct ProcessMonitorContext *monitorCtx = container_of(ctx->groups[i], struct ProcessMonitorContext,
+                                                                    group);
+            struct pqos_mon_data *data = ctx->groups[i];
+            struct ProcessMonitorRecord record;
+            record.pid = monitorCtx->pid;
+            record.llc = data->values.llc;
+            record.timestamp = getCurrentTimeMilli();
+            record.llcMisses = data->values.llc_misses;
+            record.ipc = data->values.ipc;
+            record.localMemoryDelta = data->values.mbm_local_delta;
+            record.remoteMemoryDelta = data->values.mbm_remote_delta;
+            writeRecord(&record, monitorCtx->outFile);
+        }
+
+        unlockAndSleep:
         pthread_mutex_unlock(&ctx->lock);
         nanosleep(&sleepTime, NULL);
     }
 
+    log_info("进程监控线程退出");
     return NULL;
 }
 
@@ -121,14 +142,15 @@ struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli) {
 }
 
 int rm_monitor_destroy(struct ProcessMonitor *ctx) {
+    log_info("接收到结束监控的请求");
     ctx->running = false;
 
     // 等待结束
+    log_info("正在等待监控线程退出");
     pthread_join(ctx->tid, NULL);
 
-    pthread_mutex_lock(&ctx->lock);
-
     // 清理资源
+    log_info("正在写入剩余监控数据并回收资源");
     for (int i = 0; i < ctx->lenGroups; i++) {
         destroyContext(ctx->groups[i]);
     }
@@ -136,16 +158,19 @@ int rm_monitor_destroy(struct ProcessMonitor *ctx) {
     free(ctx->groups);
     ctx->lenGroups = 0;
 
-    pthread_mutex_unlock(&ctx->lock);
     pthread_mutex_destroy(&ctx->lock);
 
     free(ctx);
+
+    log_info("监控成功关闭");
     return 0;
 }
 
 int rm_monitor_add_process(struct ProcessMonitor *ctx, pid_t pid) {
+    log_info("接收到添加进程的请求，进程pid为%d", pid);
     // 检查进程是否存在
     if (kill(pid, 0) == -1) {
+        log_error("进程pid %d 不存在", pid);
         return errno;
     }
 
@@ -153,6 +178,7 @@ int rm_monitor_add_process(struct ProcessMonitor *ctx, pid_t pid) {
     pthread_mutex_lock(&ctx->lock);
     // 监控数量不能大于RMID数量
     if (ctx->lenGroups >= ctx->maxRMID) {
+        log_error("监控进程数已达最大值%d", ctx->lenGroups);
         retVal = ERR_MONITOR_FULL;
         goto unlock;
     }
@@ -160,6 +186,7 @@ int rm_monitor_add_process(struct ProcessMonitor *ctx, pid_t pid) {
     // 检查是否有重复的
     for (int i = 0; i < ctx->lenGroups; i++) {
         if (ctx->groups[i]->pids[0] == pid) {
+            log_error("已存在pid为%d的监控进程", pid);
             retVal = ERR_DUPLICATE_PID;
             goto unlock;
         }
@@ -169,27 +196,35 @@ int rm_monitor_add_process(struct ProcessMonitor *ctx, pid_t pid) {
     sprintf(filename, "%d.csv", pid);
     FILE *outFile = fopen(filename, "w");
     if (outFile == NULL) {
+        log_error("无法创建文件%s，原因为%s", filename, strerror(errno));
         retVal = errno;
         goto unlock;
     }
 
+    log_info("正在向系统请求加入监控进程%d", pid);
     struct ProcessMonitorContext *monitorCtx = malloc(sizeof(struct ProcessMonitorContext));
     memset(monitorCtx, 0, sizeof(struct ProcessMonitorContext));
     monitorCtx->pid = pid;
     monitorCtx->outFile = outFile;
-    pqos_mon_start_pid(pid,
-                       PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS, NULL, &monitorCtx->group);
+    retVal = pqos_mon_start_pid(pid,
+                                PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW |
+                                PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS, NULL, &monitorCtx->group);
+    if (retVal != PQOS_RETVAL_OK) {
+        log_info("请求监控进程%d失败，返回码为%d", pid, retVal);
+        goto unlock;
+    }
 
     ctx->groups = realloc(ctx->groups, (ctx->lenGroups + 1) * sizeof(struct ProcessMonitorContext *));
     ctx->groups[ctx->lenGroups++] = &monitorCtx->group;
 
+    log_info("进程%d已进入监控队列", pid);
     unlock:
     pthread_mutex_unlock(&ctx->lock);
     return retVal;
 }
 
 int rm_monitor_remove_process(struct ProcessMonitor *ctx, pid_t pid) {
+    log_info("接收到取消监控进程%d的请求", pid);
     pthread_mutex_lock(&ctx->lock);
     for (int i = 0; i < ctx->lenGroups; i++) {
         if (ctx->groups[i]->pids[0] == pid) {
@@ -197,10 +232,12 @@ int rm_monitor_remove_process(struct ProcessMonitor *ctx, pid_t pid) {
             // 将最后的一个过来
             ctx->groups[i] = ctx->groups[--ctx->lenGroups];
             pthread_mutex_unlock(&ctx->lock);
+            log_info("成功取消对进程%d的监控", pid);
             return 0;
         }
     }
 
+    log_warn("监控队列中找不到进程%d", pid);
     pthread_mutex_unlock(&ctx->lock);
     return ESRCH;
 }

@@ -37,7 +37,7 @@ protected:
 };
 
 TEST_F(ProcessMonitorTest, single_process) {
-    ProcessMonitor *monitor = rm_monitor_create(100);
+    ProcessMonitor *monitor = rm_monitor_create(300);
     ASSERT_NE(nullptr, monitor);
     ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
     sleep(1);
