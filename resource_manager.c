@@ -14,15 +14,21 @@ struct pqos_config config = {
 int init = 0;
 
 int rm_init() {
-    int retVal = 0;
     if (init == 0) {
-        retVal = pqos_init(&config);
-        if (retVal == PQOS_RETVAL_OK) {
-            init = 1;
+        int retVal = pqos_init(&config);
+        if (retVal != PQOS_RETVAL_OK) {
+            return retVal;
         }
+        // 避免之前的错误运行导致资源的浪费
+        retVal = pqos_mon_reset();
+        if (retVal != PQOS_RETVAL_OK) {
+            pqos_fini();
+            return retVal;
+        }
+        init = 1;
     }
 
-    return retVal;
+    return 0;
 }
 
 int rm_finalize() {
