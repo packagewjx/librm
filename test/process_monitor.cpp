@@ -86,12 +86,34 @@ TEST_F(ProcessMonitorTest, remove_process) {
     ASSERT_EQ(0, rm_monitor_remove_process(m, 2));
 }
 
+TEST_F(ProcessMonitorTest, process_stop_during_monitor) {
+    int childPid = fork();
+    if (childPid == 0) {
+        // in child
+        sleep(1);
+        exit(0);
+    } else {
+        ProcessMonitor *m = rm_monitor_create(500);
+        timespec waitTime = {
+                .tv_sec = 0,
+                .tv_nsec = 100000000
+        };
+        ASSERT_NE(nullptr, m);
+        // wait for child
+        while (kill(childPid, 0) == -1) {
+            nanosleep(&waitTime, nullptr);
+        }
+        ASSERT_EQ(0, rm_monitor_add_process(m, childPid));
+        sleep(2);
+    }
+}
+
 TEST(process_monitor, init_fail) {
     ProcessMonitor *p = rm_monitor_create(100);
     ASSERT_EQ(nullptr, p);
 }
 
-void checkCsv(const char* fileName) {
+void checkCsv(const char *fileName) {
     int fd = open(fileName, O_RDONLY);
     ASSERT_NE(-1, fd);
 

@@ -68,6 +68,7 @@ int rm_monitor_destroy(struct ProcessMonitor *ctx);
 
 /**
  * 添加pid进程到当前监控的进程
+ * 注意，若进程在监控途中结束，不会产生任何错误，但是会导致监控资源的浪费
  *
  * @return 执行结果
  * @retval 0 成功
