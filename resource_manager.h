@@ -49,6 +49,8 @@ int rm_finalize();
 
 struct ProcessMonitor;
 
+struct ProcessMonitorContext;
+
 /**
  * 创建Monitor实例
  * @param sleepMilli 取样间隔时长，单位为毫秒
@@ -87,6 +89,27 @@ int rm_monitor_add_process(struct ProcessMonitor *ctx, pid_t pid);
  * @retval 非0 代表失败
  */
 int rm_monitor_remove_process(struct ProcessMonitor *ctx, pid_t pid);
+
+/**
+ * 添加一组进程监控，监控的结果将会写入到指定的文件中
+ * @param monitorCtx [out]
+ * @return 执行结果
+ * @retval 0 执行成功
+ * @retval ESRCH 进程列表中的进程不存在
+ * @retval ERR_MONITOR_FULL 无法再添加进程
+ */
+int rm_monitor_add_process_group(struct ProcessMonitor *ctx, pid_t *pidList, int lenPidList, const char *outFile,
+                                 struct ProcessMonitorContext **monitorCtx);
+
+/**
+ * 停止监控进程组
+ * @param monitorCtx [in] 受监控的进程组信息
+ * @return 执行结果
+ * @retval 0 执行成功
+ * @retval
+ */
+int rm_monitor_remove_process_group(struct ProcessMonitor *ctx, struct ProcessMonitorContext *monitorCtx);
+
 
 /**
  * 获取最大能够同时监控的进程数量

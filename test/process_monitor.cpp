@@ -63,7 +63,7 @@ TEST_F(ProcessMonitorTest, multiple_process) {
 }
 
 TEST_F(ProcessMonitorTest, illeagl_process) {
-    ProcessMonitor *monitor = rm_monitor_create(1000000);
+    ProcessMonitor *monitor = rm_monitor_create(500);
     ASSERT_NE(nullptr, monitor);
 
     // 不存在的
@@ -72,10 +72,11 @@ TEST_F(ProcessMonitorTest, illeagl_process) {
     // 重复的
     ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
     ASSERT_EQ(ERR_DUPLICATE_PID, rm_monitor_add_process(monitor, 1));
+    rm_monitor_destroy(monitor);
 }
 
 TEST_F(ProcessMonitorTest, remove_process) {
-    ProcessMonitor *m = rm_monitor_create(10000);
+    ProcessMonitor *m = rm_monitor_create(1000);
     ASSERT_NE(nullptr, m);
     ASSERT_EQ(0, rm_monitor_add_process(m, 1));
     ASSERT_EQ(0, rm_monitor_add_process(m, 2));
@@ -84,6 +85,7 @@ TEST_F(ProcessMonitorTest, remove_process) {
     ASSERT_EQ(0, rm_monitor_remove_process(m, getpid()));
     ASSERT_EQ(0, rm_monitor_remove_process(m, 1));
     ASSERT_EQ(0, rm_monitor_remove_process(m, 2));
+    rm_monitor_destroy(m);
 }
 
 TEST_F(ProcessMonitorTest, process_stop_during_monitor) {
@@ -106,6 +108,19 @@ TEST_F(ProcessMonitorTest, process_stop_during_monitor) {
         ASSERT_EQ(0, rm_monitor_add_process(m, childPid));
         sleep(2);
     }
+}
+
+TEST_F(ProcessMonitorTest, process_group_monitor) {
+    ProcessMonitor *m = rm_monitor_create(200);
+    pid_t list[2] = {1, getpid()};
+    ProcessMonitorContext* ctx;
+    int retVal = rm_monitor_add_process_group(m, list, 2, "test.csv", &ctx);
+    ASSERT_EQ(0, retVal);
+    sleep(1);
+    retVal = rm_monitor_remove_process_group(m, ctx);
+    ASSERT_EQ(0, retVal);
+    checkCsv("test.csv");
+    rm_monitor_destroy(m);
 }
 
 TEST(process_monitor, init_fail) {

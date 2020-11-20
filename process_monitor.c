@@ -67,6 +67,22 @@ void destroyContext(struct pqos_mon_data *ctx) {
     free(monitorCtx);
 }
 
+int processNotExist(pid_t pid) {
+    return kill(pid, 0) == -1;
+}
+
+char *pidListToCommaSeparatedString(pid_t *pidList, int pidListLen) {
+    // 一个pid预留10个字节
+    char *buf = malloc(10 * pidListLen * sizeof(char));
+    char *start = buf;
+    for (int i = 0; i < pidListLen; i++) {
+        start += sprintf(start, "%d", pidList[i]);
+        *start++ = ',';
+    }
+    *(start - 1) = '\0';
+    return buf;
+}
+
 void *monitorThread(void *args) {
     struct ProcessMonitor *ctx = args;
     struct timespec sleepTime = {
@@ -246,3 +262,72 @@ unsigned int rm_monitor_get_max_process(struct ProcessMonitor *ctx) {
     return ctx->maxRMID;
 }
 
+int rm_monitor_add_process_group(struct ProcessMonitor *ctx, pid_t *pidList, int lenPidList, const char *outFile,
+                                 struct ProcessMonitorContext **monitorCtx) {
+    // 检查进程是否都存在
+    for (int i = 0; i < lenPidList; i++) {
+        if (processNotExist(pidList[i])) {
+            log_error("进程%d不存在", pidList[i]);
+            return ESRCH;
+        }
+    }
+
+    int retVal = 0;
+    pthread_mutex_lock(&ctx->lock);
+    if (ctx->lenGroups >= ctx->maxRMID) {
+        retVal = ERR_MONITOR_FULL;
+        goto unlock;
+    }
+
+    FILE *file = fopen(outFile, "w");
+    if (file == NULL) {
+        int err = errno;
+        log_error("无法创建文件，原因为%s", strerror(err));
+        retVal = err;
+        goto unlock;
+    }
+
+    char *pidListString = pidListToCommaSeparatedString(pidList, lenPidList);
+    log_info("正在将一组进程加入监控，进程为%s", pidListString);
+    free(pidListString);
+    struct ProcessMonitorContext *mctx = malloc(sizeof(struct ProcessMonitorContext));
+    memset(mctx, 0, sizeof(struct ProcessMonitorContext));
+    mctx->outFile = file;
+    retVal = pqos_mon_start_pids(lenPidList, pidList,
+                                 PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW |
+                                 PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS, NULL, &mctx->group);
+    if (retVal != PQOS_RETVAL_OK) {
+        log_info("请求监控进程组失败，返回码为%d", retVal);
+        goto unlock;
+    }
+
+    ctx->groups = realloc(ctx->groups, (ctx->lenGroups + 1) * sizeof(struct ProcessMonitorContext *));
+    ctx->groups[ctx->lenGroups++] = &mctx->group;
+    *monitorCtx = mctx;
+
+    unlock:
+    pthread_mutex_unlock(&ctx->lock);
+    return retVal;
+}
+
+int rm_monitor_remove_process_group(struct ProcessMonitor *ctx, struct ProcessMonitorContext *monitorCtx) {
+    char *pidListString = pidListToCommaSeparatedString(monitorCtx->group.pids, (int) monitorCtx->group.num_pids);
+    log_info("接收到取消监控进程组的请求，进程组进程为：%s", pidListString);
+    free(pidListString);
+
+    pthread_mutex_lock(&ctx->lock);
+    for (int i = 0; i < ctx->lenGroups; i++) {
+        if (container_of(ctx->groups[i], struct ProcessMonitorContext, group) == monitorCtx) {
+            destroyContext(ctx->groups[i]);
+            // 将最后的一个过来
+            ctx->groups[i] = ctx->groups[--ctx->lenGroups];
+            pthread_mutex_unlock(&ctx->lock);
+            log_info("成功取消对进程组的监控");
+            return 0;
+        }
+    }
+
+    log_warn("监控队列中找不到进程组");
+    pthread_mutex_unlock(&ctx->lock);
+    return ESRCH;
+}
