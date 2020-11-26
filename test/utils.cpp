@@ -65,16 +65,23 @@ TEST(stack, push_pop_sequence) {
     EXPECT_EQ(1, *(int *) stackPop(&stack));
 }
 
-TEST(joinString, normal) {
+TEST(general, joinString) {
     char *test[] = {"1", "2", "3"};
     char *result = joinString(test, 3, ',');
     ASSERT_STREQ("1,2,3", result);
     free(result);
 }
 
-TEST(pidListString, normal) {
+TEST(general, pidListString) {
     pid_t list[] = {1, 2, 3};
     char *result = pidListToCommaSeparatedString(list, 3);
     ASSERT_STREQ("1,2,3", result);
     free(result);
+}
+
+TEST(general, highestBit) {
+    EXPECT_EQ(1, highestBit(1));
+    EXPECT_EQ(2, highestBit(2));
+    EXPECT_EQ(4, highestBit(5));
+    EXPECT_EQ(8, highestBit(10));
 }

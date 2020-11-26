@@ -43,3 +43,12 @@ char *joinString(char **str, int lenStr, char sep) {
     *(curr - 1) = 0;
     return res;
 }
+
+inline int highestBit(int n) {
+    n |= (n >>  1);
+    n |= (n >>  2);
+    n |= (n >>  4);
+    n |= (n >>  8);
+    n |= (n >> 16);
+    return n - (n >> 1);
+}

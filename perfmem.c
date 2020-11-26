@@ -12,7 +12,7 @@
 #include <dirent.h>
 #include "perfmem.h"
 #include "utils/general.h"
-#include "log/src/log.h"
+#include "log.h"
 
 #define PERF_COUNT "5"
 #define PERF_SWITCH_OUTPUT "--switch-output=1s"

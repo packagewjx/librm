@@ -3,7 +3,7 @@
 
 extern "C" {
 #include "../perfmem.h"
-#include "../log/src/log.h"
+#include "log.h"
 extern struct rm_mem_mon_trace_data *read_perf_data(const char *name, int *recordLen);
 }
 

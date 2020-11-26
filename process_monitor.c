@@ -4,7 +4,7 @@
 
 #include "resource_manager.h"
 #include "utils/general.h"
-#include "log/src/log.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <stdlib.h>

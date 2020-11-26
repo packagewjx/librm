@@ -13,4 +13,6 @@ char *pidListToCommaSeparatedString(pid_t *pidList, int pidListLen);
 
 char *joinString(char **str, int lenStr, char sep);
 
+int highestBit(int n);
+
 #endif //RESOURCEMANAGER_GENERAL_H
