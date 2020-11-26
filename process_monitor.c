@@ -71,18 +71,6 @@ int processNotExist(pid_t pid) {
     return kill(pid, 0) == -1;
 }
 
-char *pidListToCommaSeparatedString(pid_t *pidList, int pidListLen) {
-    // 一个pid预留10个字节
-    char *buf = malloc(10 * pidListLen * sizeof(char));
-    char *start = buf;
-    for (int i = 0; i < pidListLen; i++) {
-        start += sprintf(start, "%d", pidList[i]);
-        *start++ = ',';
-    }
-    *(start - 1) = '\0';
-    return buf;
-}
-
 void *monitorThread(void *args) {
     struct ProcessMonitor *ctx = args;
     struct timespec sleepTime = {

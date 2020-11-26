@@ -4,6 +4,7 @@
 
 extern "C" {
 #include "../utils/container.h"
+#include "../utils/general.h"
 }
 
 #include <cstdlib>
@@ -42,7 +43,7 @@ TEST(stack, enlarge) {
     EXPECT_GT(stack.cap, stack.len);
     EXPECT_EQ(Size, stack.len);
     for (int i = 0; i < Size; i++) {
-        EXPECT_EQ(testData[Size - 1 - i], *(int*)stackPop(&stack));
+        EXPECT_EQ(testData[Size - 1 - i], *(int *) stackPop(&stack));
     }
 }
 
@@ -55,11 +56,25 @@ TEST(stack, push_pop_sequence) {
     stackPush(&stack, &data[1]);
     stackPush(&stack, &data[2]);
 
-    EXPECT_EQ(3, *(int*)stackPop(&stack));
+    EXPECT_EQ(3, *(int *) stackPop(&stack));
     stackPush(&stack, &data[3]);
-    EXPECT_EQ(4, *(int*)stackPop(&stack));
-    EXPECT_EQ(2, *(int*)stackPop(&stack));
+    EXPECT_EQ(4, *(int *) stackPop(&stack));
+    EXPECT_EQ(2, *(int *) stackPop(&stack));
     stackPush(&stack, &data[4]);
-    EXPECT_EQ(5, *(int*)stackPop(&stack));
-    EXPECT_EQ(1, *(int*)stackPop(&stack));
+    EXPECT_EQ(5, *(int *) stackPop(&stack));
+    EXPECT_EQ(1, *(int *) stackPop(&stack));
+}
+
+TEST(joinString, normal) {
+    char *test[] = {"1", "2", "3"};
+    char *result = joinString(test, 3, ',');
+    ASSERT_STREQ("1,2,3", result);
+    free(result);
+}
+
+TEST(pidListString, normal) {
+    pid_t list[] = {1, 2, 3};
+    char *result = pidListToCommaSeparatedString(list, 3);
+    ASSERT_STREQ("1,2,3", result);
+    free(result);
 }
