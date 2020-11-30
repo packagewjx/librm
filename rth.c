@@ -91,7 +91,7 @@ int calculateReuseTimeAndFree(void *const context, void *const elm) {
     struct rm_mem_sample_entry *ent = elm;
     u_int64_t reuseTime = ent->lastTime - ent->firstTime;
     if (reuseTime > result->maxTime) {
-        log_warn("丢弃复用时长为%ld的记录", reuseTime);
+        result->occurrence[result->maxTime + 1]++;
     } else {
         result->occurrence[reuseTime]++;
     }
@@ -101,14 +101,17 @@ int calculateReuseTimeAndFree(void *const context, void *const elm) {
 }
 
 int rm_mem_rth_finish(struct rm_mem_rth_context *ctx, struct rm_mem_rth **rth, int maxTime) {
-    int *occurrence = malloc((maxTime + 1) * sizeof(int));
-    memset(occurrence, 0, (maxTime + 1) * sizeof(int));
+    int *occurrence = malloc((maxTime + 2) * sizeof(int));
+    memset(occurrence, 0, (maxTime + 2) * sizeof(int));
     struct rm_mem_rth *result = malloc(sizeof(struct rm_mem_rth));
     result->maxTime = maxTime;
     result->occurrence = occurrence;
     hashmap_iterate(&ctx->reservoir, calculateReuseTimeAndFree, result);
     hashmap_destroy(&ctx->reservoir);
     *rth = result;
+    if (occurrence[maxTime + 1] > 0) {
+        log_warn("RTH中存在%d条重使用时间大于%d的记录", occurrence[maxTime + 1], maxTime);
+    }
     return 0;
 }
 

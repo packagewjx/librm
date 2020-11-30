@@ -16,6 +16,8 @@ struct rm_mem_rth_context {
 
 
 struct rm_mem_rth {
+    // 大小为maxTime+2的数组。其中，0位置的值代表着仅使用过一次的记录，maxTime+1 位置的记录则是比maxTime更大的记录的数量，其余则是
+    // 重用时长为数组下标的记录。
     int *occurrence;
     int maxTime;
 };
@@ -41,7 +43,7 @@ int rm_mem_rth_update(struct rm_mem_rth_context *ctx, struct rm_mem_mon_trace_da
 /**
  * 结束采样并计算RTH
  * @param ctx [in] 结束采样，并将数据计算出对应的RTH
- * @param rth [out] 计算得出的RTH
+ * @param rth [out] 计算得出的RTH。使用完毕后应该使用rm_mem_rth_destroy函数回收资源。
  * @return 执行结果
  * @retval 0 执行成功
  */

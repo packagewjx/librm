@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #include <cstdlib>
+#include <climits>
 #include <gtest/gtest.h>
 
 TEST(stack, pushpop) {
@@ -84,4 +85,33 @@ TEST(general, highestBit) {
     EXPECT_EQ(2, highestBit(2));
     EXPECT_EQ(4, highestBit(5));
     EXPECT_EQ(8, highestBit(10));
+}
+
+TEST(general, processRunning) {
+    ASSERT_EQ(0, processRunning(1));
+    ASSERT_EQ(0, processRunning(getpid()));
+    ASSERT_EQ(-1, processRunning(100000000));
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        exit(0);
+    }
+    sleep(1);
+    ASSERT_EQ(-2, processRunning(pid));
+    waitpid(pid, nullptr, 0);
+    ASSERT_EQ(-1, processRunning(pid));
+}
+
+TEST(general, recursivelyRemove) {
+    char dir1[] = "tmp.XXXXXXX";
+    mkdtemp(dir1);
+    char dir2[] = "tmp.XXXXXXX";
+    char path[PATH_MAX];
+    sprintf(path, "%s/%s", dir1, dir2);
+    mkdtemp(path);
+    char file[] = "tmp.XXXXXX";
+    sprintf(path, "%s/%s", dir1, file);
+    mktemp(path);
+
+    ASSERT_EQ(0, recursivelyRemove(dir1));
 }

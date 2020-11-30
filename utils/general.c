@@ -8,6 +8,10 @@
 #include <sys/time.h>
 #include <stddef.h>
 #include <string.h>
+#include <signal.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/dir.h>
 
 unsigned long getCurrentTimeMilli() {
     struct timeval tv;
@@ -45,10 +49,55 @@ char *joinString(char **str, int lenStr, char sep) {
 }
 
 inline int highestBit(int n) {
-    n |= (n >>  1);
-    n |= (n >>  2);
-    n |= (n >>  4);
-    n |= (n >>  8);
+    n |= (n >> 1);
+    n |= (n >> 2);
+    n |= (n >> 4);
+    n |= (n >> 8);
     n |= (n >> 16);
     return n - (n >> 1);
+}
+
+inline int processRunning(pid_t pid) {
+    if (kill(pid, 0) == -1) {
+        return -1;
+    }
+    char fileName[100];
+    sprintf(fileName, "/proc/%d/stat", pid);
+    FILE *file = fopen(fileName, "r");
+    if (file == NULL) {
+        return errno;
+    }
+    char status;
+    fscanf(file, "%*d %*s %s %*d", &status);
+    switch (status) {
+        case 'S':
+        case 'D':
+        case 'R':
+            return 0;
+        default:
+            return -2;
+    }
+}
+
+int recursivelyRemove(const char *path) {
+    struct stat s;
+    stat(path, &s);
+    if (S_ISDIR(s.st_mode)) {
+        DIR *dir = opendir(path);
+        struct dirent *ent;
+        while ((ent = readdir(dir)) != NULL) {
+            if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
+                continue;
+            }
+            char childPath[PATH_MAX];
+            sprintf(childPath, "%s/%s", path, ent->d_name);
+            recursivelyRemove(childPath);
+        }
+        free(dir);
+    }
+    if (-1 == remove(path)) {
+        printf("删除%s出错: %s", path, strerror(errno));
+        return -1;
+    }
+    return 0;
 }

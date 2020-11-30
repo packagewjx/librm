@@ -17,7 +17,7 @@
 #define ERR_TOO_MANY_MBA 101
 #define ERR_EMPTY_PID_LIST 102
 #define ERR_MONITOR_FULL 103
-#define ERR_DUPLICATE_PID 104
+#define ERR_DUPLICATE_GROUP 104
 
 /**
  * ================================================
@@ -69,28 +69,6 @@ struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli);
 int rm_monitor_destroy(struct ProcessMonitor *ctx);
 
 /**
- * 添加pid进程到当前监控的进程
- * 注意，若进程在监控途中结束，不会产生任何错误，但是会导致监控资源的浪费
- *
- * @return 执行结果
- * @retval 0 成功
- * @retval ERR_MONITOR_FULL 代表不能再添加监控
- * @retval ESRCH 代表进程不存在
- * @retval 其他值 失败
- */
-int rm_monitor_add_process(struct ProcessMonitor *ctx, pid_t pid);
-
-/**
- * 从当前监控的进程中删除pid进程
- *
- * @return 执行结果
- * @retval 0 代表删除成功，值得注意的是若pid并不存在于监控范围也算是成功
- * @retval ESRCH 代表找不到这个进程
- * @retval 非0 代表失败
- */
-int rm_monitor_remove_process(struct ProcessMonitor *ctx, pid_t pid);
-
-/**
  * 添加一组进程监控，监控的结果将会写入到指定的文件中
  * @param monitorCtx [out]
  * @return 执行结果
@@ -98,11 +76,11 @@ int rm_monitor_remove_process(struct ProcessMonitor *ctx, pid_t pid);
  * @retval ESRCH 进程列表中的进程不存在
  * @retval ERR_MONITOR_FULL 无法再添加进程
  */
-int rm_monitor_add_process_group(struct ProcessMonitor *ctx, pid_t *pidList, int lenPidList, const char *outFile,
+int rm_monitor_add_process_group(struct ProcessMonitor *ctx, pid_t *pidList, int lenPidList, const char *groupId,
                                  struct ProcessMonitorContext **monitorCtx);
 
 /**
- * 停止监控进程组
+ * 手动停止监控进程组
  * @param monitorCtx [in] 受监控的进程组信息
  * @return 执行结果
  * @retval 0 执行成功

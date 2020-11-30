@@ -30,14 +30,17 @@ int rm_mem_mon_start(pid_t *pidList, int lenPid, struct rm_mem_mon_data *data) {
 
     int pid = fork();
     if (pid == 0) {
+        // set follow-fork-mode child
+        // set detach-on-fork off
+        printf("这里\n");
         char *pidListString = pidListToCommaSeparatedString(pidList, lenPid);
         char outFileName[100];
         pid = getpid();
         sprintf(outFileName, "%s/%s", tmpDir, PERF_OUT_FILE);
         char *args[] = {"perf", "record", "-e", "cpu/mem-loads/p,cpu/mem-stores/p", "-d", "-c", PERF_COUNT, "-o",
                         outFileName,
-                        PERF_SWITCH_OUTPUT, "--aio=4", "-p", pidListString, 0};
-        char *cmd = joinString(args, 13, ' ');
+                        PERF_SWITCH_OUTPUT, "-p", pidListString, 0};
+        char *cmd = joinString(args, 12, ' ');
         log_info("启动perf监控，进程号：%d，执行命令：%s", pid, cmd);
         free(cmd);
         execvp(args[0], args);
@@ -96,6 +99,7 @@ struct rm_mem_mon_trace_data *read_perf_data(const char *name, int *recordLen) {
         sscanf(line, "%*d,%*d,%*i,%li,%*d,%*i,%*s", &result[idx].addr);
         idx++;
     }
+    log_info("读取到%d条内存访问记录", idx);
     *recordLen = idx;
 
     int status;
@@ -107,10 +111,11 @@ struct rm_mem_mon_trace_data *read_perf_data(const char *name, int *recordLen) {
 }
 
 int rm_mem_mon_poll(struct rm_mem_mon_data *data, int *recordLen, struct rm_mem_mon_trace_data **records) {
-    if (kill(data->perfPid, 0) == -1) {
-        int err = errno;
-        log_error("perf进程%d不存在", data->perfPid);
-        return err;
+    if (processRunning(data->perfPid)) {
+        log_error("perf进程%d不在运行", data->perfPid);
+        *recordLen = 0;
+        *records = NULL;
+        return 1;
     }
 
     DIR *dir = opendir(data->perfDataDir);
@@ -138,10 +143,10 @@ int rm_mem_mon_poll(struct rm_mem_mon_data *data, int *recordLen, struct rm_mem_
         if (strcmp(PERF_OUT_FILE, ent->d_name) == 0) {
             continue;
         }
-        size_t len = strlen(ent->d_name);
-        char *fileName = malloc(sizeof(char) * (len + 1));
-        strcpy(fileName, ent->d_name);
-        fileName[len] = 0;
+        char perfFileName[PATH_MAX];
+        size_t len = sprintf(perfFileName, "%s/%s", data->perfDataDir, ent->d_name);
+        char *fileName = malloc(sizeof(char) * len);
+        strcpy(fileName, perfFileName);
         fileNames = realloc(fileNames, (lenFileNames + 1) * sizeof(char *));
         fileNames[lenFileNames] = fileName;
         lenFileNames++;
@@ -150,6 +155,7 @@ int rm_mem_mon_poll(struct rm_mem_mon_data *data, int *recordLen, struct rm_mem_
         log_info("perf record 进程 %d 没有获取到监控数据，直接返回", data->perfPid);
         *recordLen = 0;
         *records = NULL;
+        free(dir);
         return 0;
     }
     // 给文件名排序，确保按时间升序（字典序即可）
@@ -159,9 +165,7 @@ int rm_mem_mon_poll(struct rm_mem_mon_data *data, int *recordLen, struct rm_mem_
     struct rm_mem_mon_trace_data *result = NULL;
     for (int i = 0; i < lenFileNames; i++) {
         int partLen;
-        char perfFileName[100];
-        sprintf(perfFileName, "%s/%s", data->perfDataDir, fileNames[i]);
-        struct rm_mem_mon_trace_data *partResult = read_perf_data(perfFileName, &partLen);
+        struct rm_mem_mon_trace_data *partResult = read_perf_data(fileNames[i], &partLen);
         result = realloc(result, (len + partLen) * sizeof(struct rm_mem_mon_trace_data));
         memcpy(result + len, partResult, partLen * sizeof(struct rm_mem_mon_trace_data));
         len += partLen;
@@ -173,21 +177,27 @@ int rm_mem_mon_poll(struct rm_mem_mon_data *data, int *recordLen, struct rm_mem_
 
     // 清理资源
     for (int i = 0; i < lenFileNames; i++) {
-        remove(fileNames[i]);
+        if (0 != remove(fileNames[i])) {
+            log_error("删除%s文件失败，错误为：%s", fileNames[i], strerror(errno));
+        }
+
         free(fileNames[i]);
     }
     free(fileNames);
+    free(dir);
 
     return 0;
 }
 
 int rm_mem_mon_stop(struct rm_mem_mon_data *data) {
+    log_info("接收到结束perf监控的请求，监控进程Id: %d", data->perfPid);
     int retVal = kill(data->perfPid, SIGTERM);
     if (retVal != 0) {
         int err = errno;
         log_error("结束perf监控时发送信号到进程%d出错，错误码为%d", data->perfPid, err);
         return err;
     }
+    recursivelyRemove(data->perfDataDir);
     free((void *) data->perfDataDir);
 
     int status;
@@ -196,6 +206,8 @@ int rm_mem_mon_stop(struct rm_mem_mon_data *data) {
         fprintf(stderr, "结束perf进程 (pid: %d) 错误", data->perfPid);
         return err;
     }
+
+    log_info("成功结束perf进程%d，进程返回：%d", data->perfPid, status);
     return 0;
 }
 

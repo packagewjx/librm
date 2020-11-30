@@ -3,6 +3,7 @@
 //
 
 #include "resource_manager.h"
+#include "log.h"
 
 #include <pqos.h>
 
@@ -15,6 +16,7 @@ int init = 0;
 
 int rm_init() {
     if (init == 0) {
+        log_set_level(LOG_INFO);
         int retVal = pqos_init(&config);
         if (retVal != PQOS_RETVAL_OK) {
             return retVal;

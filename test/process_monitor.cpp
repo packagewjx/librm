@@ -8,11 +8,14 @@ extern "C" {
 #include <fcntl.h>
 #include "pqos.h"
 #include "../resource_manager.h"
+#include "log.h"
 }
 
 #include <cstdlib>
 
-void checkCsv(const char *fileName);
+void checkPqosCsv(const char *fileName);
+
+void checkPerfCsv(const char *fileName);
 
 class ProcessMonitorTest : public ::testing::Test {
 protected:
@@ -21,6 +24,7 @@ protected:
     struct pqos_cpuinfo *cpu = nullptr;
 
     ProcessMonitorTest() {
+        log_set_level(LOG_DEBUG);
         memset(&this->config, 0, sizeof(struct pqos_config));
         this->config.fd_log = STDOUT_FILENO;
         this->config.interface = PQOS_INTER_OS;
@@ -39,57 +43,70 @@ protected:
 TEST_F(ProcessMonitorTest, single_process) {
     ProcessMonitor *monitor = rm_monitor_create(300);
     ASSERT_NE(nullptr, monitor);
-    ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
-    sleep(1);
-    rm_monitor_remove_process(monitor, 1);
+    pid_t list = getpid();
+    ProcessMonitorContext *ctx;
+    ASSERT_EQ(0, rm_monitor_add_process_group(monitor, &list, 1, "test", &ctx));
+    sleep(3);
+    rm_monitor_remove_process_group(monitor, ctx);
     rm_monitor_destroy(monitor);
 
     // 检查文件存在
-    checkCsv("1.csv");
+    checkPqosCsv("test.pqos.csv");
+    checkPerfCsv("test.rth.csv");
 }
 
-TEST_F(ProcessMonitorTest, multiple_process) {
+TEST_F(ProcessMonitorTest, multiple_process_groups) {
     ProcessMonitor *monitor = rm_monitor_create(100);
     ASSERT_NE(nullptr, monitor);
-    ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
-    ASSERT_EQ(0, rm_monitor_add_process(monitor, 2));
+    pid_t list1 = 1;
+    pid_t list2 = 2;
+    ProcessMonitorContext *c1, *c2;
+    ASSERT_EQ(0, rm_monitor_add_process_group(monitor, &list1, 1, "test-1", &c1));
+    ASSERT_EQ(0, rm_monitor_add_process_group(monitor, &list2, 1, "test-2", &c2));
     sleep(1);
-    rm_monitor_remove_process(monitor, 1);
-    rm_monitor_remove_process(monitor, 2);
+    rm_monitor_remove_process_group(monitor, c1);
+    rm_monitor_remove_process_group(monitor, c2);
     rm_monitor_destroy(monitor);
 
-    checkCsv("1.csv");
-    checkCsv("2.csv");
+    checkPqosCsv("test-1.pqos.csv");
+    checkPqosCsv("test-2.pqos.csv");
 }
 
 TEST_F(ProcessMonitorTest, illeagl_process) {
     ProcessMonitor *monitor = rm_monitor_create(500);
     ASSERT_NE(nullptr, monitor);
 
+    pid_t list = 100000000;
+    ProcessMonitorContext *ctx;
     // 不存在的
-    ASSERT_EQ(ESRCH, rm_monitor_add_process(monitor, 1000000));
+    ASSERT_EQ(ESRCH, rm_monitor_add_process_group(monitor, &list, 1, "not-exist", &ctx));
 
     // 重复的
-    ASSERT_EQ(0, rm_monitor_add_process(monitor, 1));
-    ASSERT_EQ(ERR_DUPLICATE_PID, rm_monitor_add_process(monitor, 1));
+    list = 1;
+    ASSERT_EQ(0, rm_monitor_add_process_group(monitor, &list, 1, "repeated", &ctx));
+    ASSERT_EQ(ERR_DUPLICATE_GROUP, rm_monitor_add_process_group(monitor, &list, 1, "repeated", &ctx));
     rm_monitor_destroy(monitor);
 }
 
 TEST_F(ProcessMonitorTest, remove_process) {
     ProcessMonitor *m = rm_monitor_create(1000);
     ASSERT_NE(nullptr, m);
-    ASSERT_EQ(0, rm_monitor_add_process(m, 1));
-    ASSERT_EQ(0, rm_monitor_add_process(m, 2));
-    ASSERT_EQ(0, rm_monitor_add_process(m, getpid()));
+    pid_t list1 = 1;
+    pid_t list2 = 2;
+    pid_t list3 = getpid();
+    ProcessMonitorContext *c1, *c2, *c3;
+    ASSERT_EQ(0, rm_monitor_add_process_group(m, &list1, 1, "test-1", &c1));
+    ASSERT_EQ(0, rm_monitor_add_process_group(m, &list2, 1, "test-2", &c2));
+    ASSERT_EQ(0, rm_monitor_add_process_group(m, &list3, 1, "test-3", &c3));
 
-    ASSERT_EQ(0, rm_monitor_remove_process(m, getpid()));
-    ASSERT_EQ(0, rm_monitor_remove_process(m, 1));
-    ASSERT_EQ(0, rm_monitor_remove_process(m, 2));
+    ASSERT_EQ(0, rm_monitor_remove_process_group(m, c1));
+    ASSERT_EQ(0, rm_monitor_remove_process_group(m, c2));
+    ASSERT_EQ(0, rm_monitor_remove_process_group(m, c3));
     rm_monitor_destroy(m);
 }
 
 TEST_F(ProcessMonitorTest, process_stop_during_monitor) {
-    int childPid = fork();
+    pid_t childPid = fork();
     if (childPid == 0) {
         // in child
         sleep(1);
@@ -105,21 +122,23 @@ TEST_F(ProcessMonitorTest, process_stop_during_monitor) {
         while (kill(childPid, 0) == -1) {
             nanosleep(&waitTime, nullptr);
         }
-        ASSERT_EQ(0, rm_monitor_add_process(m, childPid));
+        ProcessMonitorContext *c1;
+        ASSERT_EQ(0, rm_monitor_add_process_group(m, &childPid, 1, "child", &c1));
         sleep(2);
+        rm_monitor_destroy(m);
     }
 }
 
 TEST_F(ProcessMonitorTest, process_group_monitor) {
     ProcessMonitor *m = rm_monitor_create(200);
     pid_t list[2] = {1, getpid()};
-    ProcessMonitorContext* ctx;
+    ProcessMonitorContext *ctx;
     int retVal = rm_monitor_add_process_group(m, list, 2, "test.csv", &ctx);
     ASSERT_EQ(0, retVal);
     sleep(1);
     retVal = rm_monitor_remove_process_group(m, ctx);
     ASSERT_EQ(0, retVal);
-    checkCsv("test.csv");
+    checkPqosCsv("test.csv");
     rm_monitor_destroy(m);
 }
 
@@ -128,7 +147,7 @@ TEST(process_monitor, init_fail) {
     ASSERT_EQ(nullptr, p);
 }
 
-void checkCsv(const char *fileName) {
+void checkPqosCsv(const char *fileName) {
     int fd = open(fileName, O_RDONLY);
     ASSERT_NE(-1, fd);
 
@@ -137,4 +156,19 @@ void checkCsv(const char *fileName) {
     ASSERT_LT(0, fdstat.st_size);
 
     close(fd);
+}
+
+void checkPerfCsv(const char *fileName) {
+    FILE *f = fopen(fileName, "r");
+    ASSERT_NE(nullptr, f);
+    char line[4096];
+    int nonZeroCount = 0;
+    while (fgets(line, 4096, f) != nullptr) {
+        int len = strlen(line);
+        if (!(line[len - 1] == '0' && line[len - 2] == ',')) {
+            nonZeroCount++;
+        }
+    }
+    ASSERT_NE(0, nonZeroCount);
+    fclose(f);
 }
