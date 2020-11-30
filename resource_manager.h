@@ -58,7 +58,7 @@ struct ProcessMonitorContext;
  * @retval NULL 代表创建失败
  * @retval 非NULL 代表创建成功
  */
-struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli);
+struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli, unsigned int reservoirSize, unsigned int maxRthTime);
 
 /**
  * 关闭Monitor实例并回收资源

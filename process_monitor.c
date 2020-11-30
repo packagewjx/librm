@@ -18,9 +18,6 @@
 #include <pthread.h>
 #include <stdbool.h>
 
-#define MEM_RTH_RESERVOIR_SIZE 0x20000 // 131072
-#define MEM_RTH_MAX_TIME 100000
-
 struct ProcessMonitorContext {
     const char *groupId; // 组Id
     FILE *outFile; // 输出csv记录的文件
@@ -47,6 +44,8 @@ struct ProcessMonitor {
     struct ProcessMonitorContext **ctxList;
     unsigned int lenCtxList;
     unsigned int maxRMID;
+    unsigned int reservoirSize;
+    unsigned int maxRthTime;
 };
 
 /**
@@ -95,13 +94,13 @@ extern inline int pollPerfMon(struct ProcessMonitorContext *ctx) {
  * 回收mon_data资源
  * @param ctx 必须是ProcessMonitorContext中的group成员，否则结果是不可知的
  */
-extern inline void finishMonitor(struct ProcessMonitorContext *ctx) {
+extern inline void finishMonitor(struct ProcessMonitorContext *ctx, unsigned int maxRthTime) {
     log_info("正在结束进程组%s的监控", ctx->groupId);
     fclose(ctx->outFile);
     pqos_mon_stop(&ctx->monData);
     rm_mem_mon_stop(&ctx->memMon);
     struct rm_mem_rth *rth;
-    if (0 == rm_mem_rth_finish(&ctx->rthCtx, &rth, MEM_RTH_MAX_TIME)) {
+    if (0 == rm_mem_rth_finish(&ctx->rthCtx, &rth, maxRthTime)) {
         // 写入到文件
         char outFileName[FILENAME_MAX];
         sprintf(outFileName, "%s.rth.csv", ctx->groupId);
@@ -163,7 +162,7 @@ void *monitorThread(void *args) {
     return NULL;
 }
 
-struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli) {
+struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli, unsigned int reservoirSize, unsigned int maxRthTime) {
     const struct pqos_cap *cap;
     const struct pqos_cpuinfo *cpu;
     if (PQOS_RETVAL_OK != pqos_cap_get(&cap, &cpu)) {
@@ -177,6 +176,8 @@ struct ProcessMonitor *rm_monitor_create(unsigned int sleepMilli) {
     ctx->ctxList = malloc(0);
     ctx->lenCtxList = 0;
     ctx->maxRMID = cap->capabilities->u.mon->max_rmid;
+    ctx->reservoirSize = reservoirSize;
+    ctx->maxRthTime = maxRthTime;
     pthread_create(&ctx->tid, NULL, monitorThread, ctx);
     return ctx;
 }
@@ -192,7 +193,7 @@ int rm_monitor_destroy(struct ProcessMonitor *ctx) {
     // 清理资源
     log_info("正在写入剩余监控数据并回收资源");
     for (int i = 0; i < ctx->lenCtxList; i++) {
-        finishMonitor(ctx->ctxList[i]);
+        finishMonitor(ctx->ctxList[i], ctx->maxRthTime);
     }
 
     free(ctx->ctxList);
@@ -272,7 +273,7 @@ int rm_monitor_add_process_group(struct ProcessMonitor *ctx, pid_t *pidList, int
         goto unSuccess;
     }
     // 初始化RTH
-    retVal = rm_mem_rth_start(MEM_RTH_RESERVOIR_SIZE, &mctx->rthCtx);
+    retVal = rm_mem_rth_start(ctx->reservoirSize, &mctx->rthCtx);
     if (retVal != 0) {
         fclose(pqosFile);
         pqos_mon_stop(&mctx->monData);
@@ -304,7 +305,7 @@ int rm_monitor_remove_process_group(struct ProcessMonitor *ctx, struct ProcessMo
     pthread_mutex_lock(&ctx->lock);
     for (int i = 0; i < ctx->lenCtxList; i++) {
         if (ctx->ctxList[i] == monitorCtx) {
-            finishMonitor(ctx->ctxList[i]);
+            finishMonitor(ctx->ctxList[i], ctx->maxRthTime);
             // 将最后的一个过来
             ctx->ctxList[i] = ctx->ctxList[--ctx->lenCtxList];
             pthread_mutex_unlock(&ctx->lock);

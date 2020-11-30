@@ -41,7 +41,7 @@ protected:
 };
 
 TEST_F(ProcessMonitorTest, single_process) {
-    ProcessMonitor *monitor = rm_monitor_create(300);
+    ProcessMonitor *monitor = rm_monitor_create(300, 0x20000, 100000);
     ASSERT_NE(nullptr, monitor);
     pid_t list = getpid();
     ProcessMonitorContext *ctx;
@@ -56,7 +56,7 @@ TEST_F(ProcessMonitorTest, single_process) {
 }
 
 TEST_F(ProcessMonitorTest, multiple_process_groups) {
-    ProcessMonitor *monitor = rm_monitor_create(100);
+    ProcessMonitor *monitor = rm_monitor_create(100, 0x20000, 100000);
     ASSERT_NE(nullptr, monitor);
     pid_t list1 = 1;
     pid_t list2 = 2;
@@ -73,7 +73,7 @@ TEST_F(ProcessMonitorTest, multiple_process_groups) {
 }
 
 TEST_F(ProcessMonitorTest, illeagl_process) {
-    ProcessMonitor *monitor = rm_monitor_create(500);
+    ProcessMonitor *monitor = rm_monitor_create(500, 0x20000, 100000);
     ASSERT_NE(nullptr, monitor);
 
     pid_t list = 100000000;
@@ -89,7 +89,7 @@ TEST_F(ProcessMonitorTest, illeagl_process) {
 }
 
 TEST_F(ProcessMonitorTest, remove_process) {
-    ProcessMonitor *m = rm_monitor_create(1000);
+    ProcessMonitor *m = rm_monitor_create(1000, 0x20000, 100000);
     ASSERT_NE(nullptr, m);
     pid_t list1 = 1;
     pid_t list2 = 2;
@@ -112,7 +112,7 @@ TEST_F(ProcessMonitorTest, process_stop_during_monitor) {
         sleep(1);
         exit(0);
     } else {
-        ProcessMonitor *m = rm_monitor_create(500);
+        ProcessMonitor *m = rm_monitor_create(500, 0x20000, 100000);
         timespec waitTime = {
                 .tv_sec = 0,
                 .tv_nsec = 100000000
@@ -130,7 +130,7 @@ TEST_F(ProcessMonitorTest, process_stop_during_monitor) {
 }
 
 TEST_F(ProcessMonitorTest, process_group_monitor) {
-    ProcessMonitor *m = rm_monitor_create(200);
+    ProcessMonitor *m = rm_monitor_create(200, 0x20000, 100000);
     pid_t list[2] = {1, getpid()};
     ProcessMonitorContext *ctx;
     int retVal = rm_monitor_add_process_group(m, list, 2, "test.csv", &ctx);
@@ -138,12 +138,12 @@ TEST_F(ProcessMonitorTest, process_group_monitor) {
     sleep(1);
     retVal = rm_monitor_remove_process_group(m, ctx);
     ASSERT_EQ(0, retVal);
-    checkPqosCsv("test.csv");
+    checkPqosCsv("test.pqos.csv");
     rm_monitor_destroy(m);
 }
 
 TEST(process_monitor, init_fail) {
-    ProcessMonitor *p = rm_monitor_create(100);
+    ProcessMonitor *p = rm_monitor_create(100, 0x20000, 100000);
     ASSERT_EQ(nullptr, p);
 }
 

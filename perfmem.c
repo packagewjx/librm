@@ -22,6 +22,11 @@ int lexicographicalSort(const void *s1, const void *s2) {
     return strcmp(s1, s2);
 }
 
+extern inline u_int64_t cacheLineAddressOf(u_int64_t addr) {
+    return addr & 0xFFFFFFFFFFFFFFC0;
+}
+
+
 int rm_mem_mon_start(pid_t *pidList, int lenPid, struct rm_mem_mon_data *data) {
     char tmpDir[] = "tmp.XXXXXX";
     mkdtemp(tmpDir);
@@ -32,7 +37,6 @@ int rm_mem_mon_start(pid_t *pidList, int lenPid, struct rm_mem_mon_data *data) {
     if (pid == 0) {
         // set follow-fork-mode child
         // set detach-on-fork off
-        printf("这里\n");
         char *pidListString = pidListToCommaSeparatedString(pidList, lenPid);
         char outFileName[100];
         pid = getpid();
@@ -96,7 +100,9 @@ struct rm_mem_mon_trace_data *read_perf_data(const char *name, int *recordLen) {
         line[strcspn(line, "\n")] = 0;
         result = realloc(result, (idx + 1) * sizeof(struct rm_mem_mon_trace_data));
         log_trace("读取到行：%s", line);
-        sscanf(line, "%*d,%*d,%*i,%li,%*d,%*i,%*s", &result[idx].addr);
+        u_int64_t addr;
+        sscanf(line, "%*d,%*d,%*i,%lx,%*d,%*i,%*s", &addr);
+        result[idx].addr = cacheLineAddressOf(addr);
         idx++;
     }
     log_info("读取到%d条内存访问记录", idx);
