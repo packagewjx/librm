@@ -15,7 +15,9 @@ extern "C" {
 
 void checkPqosCsv(const char *fileName);
 
-void checkPerfCsv(const char *fileName);
+void checkRTHCsv(const char *fileName);
+
+void checkPerfStatCsv(const char *fileName);
 
 class ProcessMonitorTest : public ::testing::Test {
 protected:
@@ -52,7 +54,8 @@ TEST_F(ProcessMonitorTest, single_process) {
 
     // 检查文件存在
     checkPqosCsv("test.pqos.csv");
-    checkPerfCsv("test.rth.csv");
+    checkRTHCsv("test.rth.csv");
+    checkPerfStatCsv("test.api.csv");
 }
 
 TEST_F(ProcessMonitorTest, multiple_process_groups) {
@@ -139,6 +142,8 @@ TEST_F(ProcessMonitorTest, process_group_monitor) {
     retVal = rm_monitor_remove_process_group(m, ctx);
     ASSERT_EQ(0, retVal);
     checkPqosCsv("test.pqos.csv");
+    checkRTHCsv("test.rth.csv");
+    checkPerfStatCsv("test.api.csv");
     rm_monitor_destroy(m);
 }
 
@@ -158,7 +163,7 @@ void checkPqosCsv(const char *fileName) {
     close(fd);
 }
 
-void checkPerfCsv(const char *fileName) {
+void checkRTHCsv(const char *fileName) {
     FILE *f = fopen(fileName, "r");
     ASSERT_NE(nullptr, f);
     char line[4096];
@@ -166,6 +171,21 @@ void checkPerfCsv(const char *fileName) {
     while (fgets(line, 4096, f) != nullptr) {
         int len = strlen(line);
         if (!(line[len - 1] == '0' && line[len - 2] == ',')) {
+            nonZeroCount++;
+        }
+    }
+    ASSERT_NE(0, nonZeroCount);
+    fclose(f);
+}
+
+void checkPerfStatCsv(const char *fileName) {
+    FILE *f = fopen(fileName, "r");
+    ASSERT_NE(nullptr, f);
+    char line[4096];
+    int nonZeroCount = 0;
+    while (fgets(line, 4096, f) != nullptr) {
+        int len = strlen(line);
+        if (!(line[0] == '0' && line[1] == ',')) {
             nonZeroCount++;
         }
     }

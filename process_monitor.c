@@ -2,6 +2,11 @@
 // Created by wjx on 2020/11/10.
 //
 
+/**
+ * sudo perf stat -e mem_load_retired.l3_miss,mem_load_retired.l1_hit,mem_load_retired.l2_hit,mem_load_retired.l3_hit,instructions -p
+ * sudo perf record -e cpu/mem-loads/P,cpu/mem-stores/P -d -c 1 -p
+ */
+
 #include "resource_manager.h"
 #include "utils/general.h"
 #include "log.h"
@@ -32,8 +37,6 @@ struct ProcessMonitorRecord {
     unsigned long localMemoryDelta;
     unsigned long remoteMemoryDelta;
     unsigned long llc;
-    unsigned long llcMisses;
-    double ipc;
 };
 
 struct ProcessMonitor {
@@ -53,8 +56,8 @@ struct ProcessMonitor {
  * @return 成功的话返回大于0的数，失败返回小于0的数。
  */
 extern inline int writePqosRecord(struct ProcessMonitorRecord *record, FILE *file) {
-    return fprintf(file, "%s,%ld,%ld,%ld,%ld,%ld,%f\n", record->groupId, record->timestamp, record->localMemoryDelta,
-                   record->remoteMemoryDelta, record->llc, record->llcMisses, record->ipc);
+    return fprintf(file, "%s,%ld,%ld,%ld,%ld\n", record->groupId, record->timestamp, record->localMemoryDelta,
+                   record->remoteMemoryDelta, record->llc);
 }
 
 extern inline int pollPqosMon(struct ProcessMonitorContext *ctx) {
@@ -68,8 +71,6 @@ extern inline int pollPqosMon(struct ProcessMonitorContext *ctx) {
     record.groupId = ctx->groupId;
     record.llc = ctx->monData.values.llc;
     record.timestamp = getCurrentTimeMilli();
-    record.llcMisses = ctx->monData.values.llc_misses;
-    record.ipc = ctx->monData.values.ipc;
     record.localMemoryDelta = ctx->monData.values.mbm_local_delta;
     record.remoteMemoryDelta = ctx->monData.values.mbm_remote_delta;
     writePqosRecord(&record, ctx->outFile);
@@ -257,15 +258,15 @@ int rm_monitor_add_process_group(struct ProcessMonitor *ctx, pid_t *pidList, int
     memset(mctx, 0, sizeof(struct ProcessMonitorContext));
     // 开始pqos监控
     retVal = pqos_mon_start_pids(lenPidList, pidList,
-                                 PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                                 PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS, NULL, &mctx->monData);
+                                 PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW,
+                                 NULL, &mctx->monData);
     if (retVal != PQOS_RETVAL_OK) {
         fclose(pqosFile);
         log_error("请求pqos监控进程组%s失败，返回码为%d", groupId, retVal);
         goto unSuccess;
     }
     // 开始perf监控
-    retVal = rm_mem_mon_start(pidList, lenPidList, &mctx->memMon);
+    retVal = rm_mem_mon_start(pidList, lenPidList, &mctx->memMon, groupId);
     if (retVal != 0) {
         fclose(pqosFile);
         pqos_mon_stop(&mctx->monData);

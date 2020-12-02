@@ -8,7 +8,9 @@
 #include <stdlib.h>
 
 struct rm_mem_mon_data {
-    int perfPid;
+    const char* groupId;
+    pid_t perfMemPid;
+    pid_t perfStatPid;
     const char *perfDataDir;
 };
 
@@ -24,7 +26,7 @@ struct rm_mem_mon_trace_data {
  * @return 执行情况
  * @retval 0 执行成功
  */
-int rm_mem_mon_start(pid_t *pidList, int lenPid, struct rm_mem_mon_data *data);
+int rm_mem_mon_start(pid_t *pidList, int lenPid, struct rm_mem_mon_data *data, const char *requestId);
 
 /**
  * 获取数据

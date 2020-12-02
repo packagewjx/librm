@@ -66,7 +66,7 @@ int rm_mem_rth_update(struct rm_mem_rth_context *ctx, struct rm_mem_mon_trace_da
                         .curr = 0
                 };
                 hashmap_iterate_pairs(&ctx->reservoir, findElementAt, &findKeyCtx);
-                log_debug("丢弃地址为%d的记录", *(u_int64_t *) findKeyCtx.elm->key);
+                log_debug("丢弃地址为%#018lx的记录", *(u_int64_t *) findKeyCtx.elm->key);
                 free(findKeyCtx.elm->data);
                 hashmap_remove(&ctx->reservoir, findKeyCtx.elm->key, sizeof(u_int64_t));
             }

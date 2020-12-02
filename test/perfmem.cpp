@@ -25,7 +25,7 @@ TEST(perfmem, mem_trace) {
     log_set_level(LOG_DEBUG);
     rm_mem_mon_data group{};
     pid_t pid = getpid();
-    ASSERT_EQ(0, rm_mem_mon_start(&pid, 1, &group));
+    ASSERT_EQ(0, rm_mem_mon_start(&pid, 1, &group, "test"));
     sleep(1);
     for (int i = 0; i < 3; i++) {
         sleep(1);

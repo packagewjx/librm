@@ -80,11 +80,14 @@ int rm_monitor_add_process_group(struct ProcessMonitor *ctx, pid_t *pidList, int
                                  struct ProcessMonitorContext **monitorCtx);
 
 /**
- * 手动停止监控进程组
+ * 手动停止监控进程组。监控停止后，工作目录下将会有3个文件，分别为
+ * <groupId>.api.csv：记录了L1、L2、L3的Miss和Hit，以及执行完毕的指令数
+ * <groupId>.pqos.csv：记录了CMT的监控数据
+ * <groupId>.rth.csv：记录内存Reuse Time Histogram
  * @param monitorCtx [in] 受监控的进程组信息
  * @return 执行结果
  * @retval 0 执行成功
- * @retval
+ * @retval 其他 执行失败
  */
 int rm_monitor_remove_process_group(struct ProcessMonitor *ctx, struct ProcessMonitorContext *monitorCtx);
 
