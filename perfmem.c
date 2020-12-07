@@ -14,7 +14,7 @@
 #include "utils/general.h"
 #include "log.h"
 
-#define PERF_COUNT "3"
+#define PERF_COUNT "5"
 #define PERF_SWITCH_OUTPUT "--switch-output=1s"
 #define PERF_OUT_FILE "perf.data"
 
@@ -44,7 +44,7 @@ int rm_mem_mon_start(pid_t *pidList, int lenPid, struct rm_mem_mon_data *data, c
         char outFileName[100];
         pid = getpid();
         sprintf(outFileName, "%s/%s", tmpDir, PERF_OUT_FILE);
-        char *args[] = {"perf", "record", "-e", "cpu/mem-loads/p,cpu/mem-stores/p", "-d", "-c", PERF_COUNT, "-o",
+        char *args[] = {"perf", "record", "-e", "cpu/mem-loads,ldlat=50/P,cpu/mem-stores/P", "-d", "-c", PERF_COUNT, "-o",
                         outFileName,
                         PERF_SWITCH_OUTPUT, "-p", pidListString, 0};
         char *cmd = joinString(args, 12, ' ');

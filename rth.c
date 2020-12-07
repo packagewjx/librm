@@ -6,12 +6,15 @@
 #include "log.h"
 #include "utils/general.h"
 
+#define RAND_1 ((float) random() / (float) RAND_MAX)
+
 enum Status {
     TAGGED,
     UNTAGGED,
 };
 
 struct rm_mem_sample_entry {
+    u_int64_t addr;
     enum Status status;
     u_int64_t firstTime;
     u_int64_t lastTime;
@@ -45,44 +48,51 @@ int findElementAt(void *const context, struct hashmap_element_s *const e) {
 }
 
 int rm_mem_rth_update(struct rm_mem_rth_context *ctx, struct rm_mem_mon_trace_data *traceData, int lenTraceData) {
+    int numNew = 0, numTagged = 0, numUntagged = 0, numRemoved = 0;
+
     for (int i = 0; i < lenTraceData; i++) {
         struct rm_mem_sample_entry *ent = hashmap_get(&ctx->reservoir, (const char *) &traceData[i].addr,
                                                       sizeof(u_int64_t));
         u_int64_t time = ctx->logicalTime++;
         if (ent == NULL) {
+            numNew++;
             // 这是全新的地址。集合未满的情况下必定插入，集合已满的情况下按概率插入。
             if (ctx->capacity <= hashmap_num_entries(&ctx->reservoir)) {
                 // 在这里，集合已满
-                float stayProb = (float) ctx->capacity / time;
-                float sample = (float) random() / (float) RAND_MAX;
-                if (sample > stayProb) {
+                // 判断是否需要剔除
+                if (RAND_1 > (float) ctx->capacity / time) {
                     continue;
                 }
-                // 随机剔除一个
-                sample = (float) random() / (float) RAND_MAX;
-                struct findKeyAtContext findKeyCtx = {
-                        .elm = NULL,
-                        .target = (int) ((float) hashmap_num_entries(&ctx->reservoir) * sample),
-                        .curr = 0
-                };
-                hashmap_iterate_pairs(&ctx->reservoir, findElementAt, &findKeyCtx);
-                log_debug("丢弃地址为%#018lx的记录", *(u_int64_t *) findKeyCtx.elm->key);
-                free(findKeyCtx.elm->data);
-                hashmap_remove(&ctx->reservoir, findKeyCtx.elm->key, sizeof(u_int64_t));
+                // 随机剔除一个。为了提高随机性和节省空间，采用循环查询一个随机位置是否有数据的方法
+                int target = (int) ((float) ctx->reservoir.table_size * RAND_1);
+                while (!ctx->reservoir.data[target].in_use) {
+                    target = (int) ((float) ctx->reservoir.table_size * RAND_1);
+                }
+                struct hashmap_element_s *toRemove = &ctx->reservoir.data[target];
+                void *toFree = toRemove->data;
+                log_trace("丢弃地址为%#018lx的记录", *(u_int64_t *) toRemove->key);
+                numRemoved++;
+                hashmap_remove(&ctx->reservoir, toRemove->key, sizeof(u_int64_t));
+                free(toFree);
             }
 
             // 将新的地址插入到哈希表
             ent = malloc(sizeof(struct rm_mem_sample_entry));
+            ent->addr = traceData[i].addr;
             ent->firstTime = time;
             ent->lastTime = time;
             ent->status = UNTAGGED;
-            hashmap_put(&ctx->reservoir, (const char *) &traceData[i].addr, sizeof(u_int64_t), ent);
+            hashmap_put(&ctx->reservoir, (const char *) &ent->addr, sizeof(u_int64_t), ent);
         } else if (ent->status == UNTAGGED) {
+            numUntagged++;
             ent->status = TAGGED;
             ent->lastTime = time;
+        } else {
+            numTagged++;
         }
         // TAGGED的不做任何处理
     }
+    log_info("RTH更新状况：新插入%d，Tagged %d，Untagged %d，删除记录%d个", numNew, numTagged, numUntagged, numRemoved);
     return 0;
 }
 
@@ -101,6 +111,7 @@ int calculateReuseTimeAndFree(void *const context, void *const elm) {
 }
 
 int rm_mem_rth_finish(struct rm_mem_rth_context *ctx, struct rm_mem_rth **rth, int maxTime) {
+    log_info("结束采样并计算RTH中。Reservoir大小：%d", hashmap_num_entries(&ctx->reservoir));
     int *occurrence = malloc((maxTime + 2) * sizeof(int));
     memset(occurrence, 0, (maxTime + 2) * sizeof(int));
     struct rm_mem_rth *result = malloc(sizeof(struct rm_mem_rth));

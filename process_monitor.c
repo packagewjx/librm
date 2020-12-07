@@ -107,7 +107,7 @@ extern inline void finishMonitor(struct ProcessMonitorContext *ctx, unsigned int
         sprintf(outFileName, "%s.rth.csv", ctx->groupId);
         FILE *outFile = fopen(outFileName, "w");
         if (outFile != NULL) {
-            for (int i = 0; i <= rth->maxTime; i++) {
+            for (int i = 0; i <= rth->maxTime + 1; i++) {
                 fprintf(outFile, "%d,%d\n", i, rth->occurrence[i]);
             }
             fclose(outFile);

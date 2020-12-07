@@ -9,6 +9,7 @@ extern "C" {
 #include "pqos.h"
 #include "../resource_manager.h"
 #include "log.h"
+#include "../utils/example_programs.h"
 }
 
 #include <cstdlib>
@@ -147,10 +148,22 @@ TEST_F(ProcessMonitorTest, process_group_monitor) {
     rm_monitor_destroy(m);
 }
 
+TEST_F(ProcessMonitorTest, example_program) {
+    log_set_level(LOG_DEBUG);
+    pid_t pid = forkAndRun(sequenceMemoryAccessor);
+    ProcessMonitor *m = rm_monitor_create(1000, 0x20000, 100000);
+    ProcessMonitorContext *context;
+    ASSERT_EQ(0, rm_monitor_add_process_group(m, &pid, 1, "sequenceMemoryAccessor", &context));
+    int status;
+    waitpid(pid, &status, 0);
+    rm_monitor_destroy(m);
+}
+
 TEST(process_monitor, init_fail) {
     ProcessMonitor *p = rm_monitor_create(100, 0x20000, 100000);
     ASSERT_EQ(nullptr, p);
 }
+
 
 void checkPqosCsv(const char *fileName) {
     int fd = open(fileName, O_RDONLY);
